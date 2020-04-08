@@ -83,14 +83,14 @@ log_get_level_flag (char *log_level)
 }
 
 gboolean
-log_get_info (GKeyFile *key_file,
-              gchar **info)
+log_get_conf (GKeyFile *key_file,
+              gchar **log_conf)
 {
-  if (log_get_value (key_file, "LOG", "PATH", &info[LOG_PATH])
-      && log_get_value (key_file, "LOG", "FMT", &info[LOG_FMT])
-      && log_get_value (key_file, "LOG", "LEVEL", &info[LOG_LEVEL])
-      && log_get_value (key_file, "LOG", "MAX_BYTES", &info[LOG_MAX_BYTES])
-      && log_get_value (key_file, "LOG", "BACKUP_COUNT", &info[LOG_BACKUP_COUNT]))
+  if (log_get_value (key_file, "LOG", "PATH", &log_conf[LOG_PATH])
+      && log_get_value (key_file, "LOG", "FMT", &log_conf[LOG_FMT])
+      && log_get_value (key_file, "LOG", "LEVEL", &log_conf[LOG_LEVEL])
+      && log_get_value (key_file, "LOG", "MAX_BYTES", &log_conf[LOG_MAX_BYTES])
+      && log_get_value (key_file, "LOG", "BACKUP_COUNT", &log_conf[LOG_BACKUP_COUNT]))
   {
     return TRUE;
   }
@@ -98,40 +98,36 @@ log_get_info (GKeyFile *key_file,
 }
 
 gboolean
-log_write (GKeyFile *key_file, char *message)
+log_write (GKeyFile *key_file, char *message, char *file_name, int line_number)
 {
-  gint i;
-  gchar *info[LOG_INFO_NUMS];
-  gchar *log_message;
-  gchar *output_file_name;
+  int i;
+  gchar *log_conf[LOG_INFO_NUMS];
   GDateTime *local_time;
+  gchar *log_time_flag;
+  gchar *output_file_name;
   FILE *output_file;
 
-  if (!log_get_info (key_file, info))
+  if (!log_get_conf (key_file, log_conf))
   {
     return FALSE;
   }
 
   local_time = g_date_time_new_now_local ();
-  log_message = g_date_time_format (local_time, info[LOG_FMT]); 
+  log_time_flag = g_date_time_format (local_time, log_conf[LOG_FMT]); 
   output_file_name = g_date_time_format (local_time, "%F");
-  log_message = g_strconcat (log_message, "[", info[LOG_LEVEL], "] ", message, NULL);
-  output_file_name = g_strconcat (info[LOG_PATH], output_file_name, ".log", NULL);
+  output_file_name = g_strconcat (log_conf[LOG_PATH], output_file_name, ".log", NULL);
 
   output_file = fopen (output_file_name, "a");
-
-  g_fprintf(output_file, "%s", log_message);
-
+  g_fprintf(output_file, "%s[%s][%s:%d] %s", log_time_flag, log_conf[LOG_LEVEL], file_name, line_number, message);
   fclose (output_file);
 
+  g_date_time_unref (local_time);
   for (i = 0; i < LOG_INFO_NUMS; i++)
   {
-    g_free (info[i]);
+    g_free (log_conf[i]);
   }
-
-  g_date_time_unref (local_time);
   g_free (output_file_name);
-  g_free (log_message);
+  g_free (log_time_flag);
 
   return TRUE;
 }
