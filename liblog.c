@@ -24,7 +24,8 @@ log_read (GKeyFile *key_file,
       g_error ("Error loading key file: %s\n", error->message);
     }
     g_error_free (error);
-    return -1;
+
+    return -1; 
   }
   return 0;
 }
@@ -58,7 +59,9 @@ log_get_value (GKeyFile *key_file,
       g_error_free (error);
     }
     else
+    {
       g_warning ("No Value for the Section:[%s]\nKey:%s.\n", section, key);
+    }
     return FALSE;
   }
 
@@ -98,14 +101,27 @@ log_get_conf (GKeyFile *key_file,
 }
 
 gboolean
-log_write (GKeyFile *key_file, char *message, char *file_name, int line_number)
+log_write (GKeyFile *key_file,
+           char *message,
+           char *file_name,
+           int line_number)
 {
   int i;
   gchar *log_conf[LOG_INFO_NUMS];
   GDateTime *local_time;
-  gchar *log_time_flag;
+  gchar *log_time_prefix;
+  gchar *output_file_identifier;
   gchar *output_file_name;
-  FILE *output_file;
+  gchar *output_file;
+  char *file_extension;
+  FILE *output_fp;
+  gboolean ret_val;
+  GDir *dir;
+  GError *error = NULL;
+  const char *dir_file;
+  struct stat file_info;
+  gchar **file_separator;
+  int log_file_cnt = 0;
 
   if (!log_get_conf (key_file, log_conf))
   {
@@ -113,21 +129,73 @@ log_write (GKeyFile *key_file, char *message, char *file_name, int line_number)
   }
 
   local_time = g_date_time_new_now_local ();
-  log_time_flag = g_date_time_format (local_time, log_conf[LOG_FMT]); 
-  output_file_name = g_date_time_format (local_time, "%F");
-  output_file_name = g_strconcat (log_conf[LOG_PATH], output_file_name, ".log", NULL);
-
-  output_file = fopen (output_file_name, "a");
-  g_fprintf(output_file, "%s[%s][%s:%d] %s", log_time_flag, log_conf[LOG_LEVEL], file_name, line_number, message);
-  fclose (output_file);
-
+  log_time_prefix = g_date_time_format (local_time, "%a %b %d %H:%M:%S %Y"); 
+  file_extension = "log";
+  output_file_identifier = g_date_time_format (local_time, "%F");
+  output_file_name = g_strconcat (output_file_identifier, ".", file_extension, NULL);
+  output_file = g_strconcat (log_conf[LOG_PATH], output_file_name, NULL);
   g_date_time_unref (local_time);
+
+  dir = g_dir_open (log_conf[LOG_PATH], 0, &error);
+  if (error != NULL)
+  {
+    g_error ("Error finding key in key file: %s\n", error->message);
+    g_error_free (error);
+  }
+  while ((dir_file = g_dir_read_name (dir)) != NULL)
+  {
+    file_separator = g_strsplit (dir_file, ".", -1);
+    if (!g_strcmp0 (file_separator[1], file_extension))
+    {
+      log_file_cnt++;
+    }
+    g_strfreev (file_separator);
+  }
+
+  g_dir_rewind (dir);
+
+  while ((dir_file = g_dir_read_name (dir)) != NULL)
+  {
+    if (log_file_cnt == atoi (log_conf[LOG_BACKUP_COUNT]))
+    {
+    }
+    else if (!g_strcmp0 (output_file_name, dir_file))
+    {
+      stat (output_file, &file_info);
+      if (atoi (log_conf[LOG_MAX_BYTES]) <= file_info.st_size)
+      {
+        output_file_identifier = g_strconcat (output_file_identifier, "+", NULL);
+        g_free (output_file_name);
+        g_free (output_file);
+        output_file_name = g_strconcat (output_file_identifier, ".", file_extension, NULL);
+        output_file = g_strconcat (log_conf[LOG_PATH], output_file_name, NULL);
+        g_dir_rewind (dir);
+      }
+    }
+  }
+  g_dir_close (dir);
+
+  output_fp = fopen (output_file, "a");
+  if (output_fp == NULL)
+  {
+    g_fprintf (stderr, "Cannot open / create log file:%s\n", output_file);
+    ret_val = FALSE;
+  }
+  else
+  {
+    g_fprintf (output_fp, log_conf[LOG_FMT], log_time_prefix, log_conf[LOG_LEVEL], file_name, line_number, message); 
+    fclose (output_fp);
+    ret_val = TRUE;
+  }
+
   for (i = 0; i < LOG_INFO_NUMS; i++)
   {
     g_free (log_conf[i]);
   }
+  g_free (log_time_prefix);
+  g_free (output_file_identifier);
   g_free (output_file_name);
-  g_free (log_time_flag);
+  g_free (output_file);
 
-  return TRUE;
+  return ret_val;
 }

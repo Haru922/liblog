@@ -1,6 +1,8 @@
 #ifndef __LOG_PARSER_H__
 #define __LOG_PARSER_H__
 
+#include <sys/stat.h>
+
 #include <glib.h>
 #include <glib/gprintf.h>
 
