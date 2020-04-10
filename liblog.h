@@ -1,10 +1,13 @@
 #ifndef __LOG_PARSER_H__
 #define __LOG_PARSER_H__
 
+#include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 #include <glib.h>
 #include <glib/gprintf.h>
+#include <glib/gstdio.h>
 
 enum {
   LOG_PATH,
