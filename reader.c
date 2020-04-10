@@ -10,8 +10,8 @@ int main (int argc, char *argv[]) {
     exit (EXIT_FAILURE);
   }
 
-  log_read (key_file, argv[1], TRUE); 
-  log_get_value (key_file, argv[2], argv[3], &value);
+  log_conf_load (key_file, argv[1], TRUE); 
+  log_conf_get_value (key_file, argv[2], argv[3], &value);
 
   g_print ("%s\n", value);
   g_free (value);

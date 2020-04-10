@@ -8,9 +8,9 @@ int main (int argc, char *argv[]) {
     exit (EXIT_FAILURE);
   }
 
-  log_read (key_file, argv[1], TRUE); 
+  log_conf_load (key_file, argv[1], TRUE); 
 
-  log_write (key_file, "log_write\n", __FILE__, __LINE__);
+  log_write (key_file, "Log Message from writer.\n", __FILE__, __LINE__);
 
   g_key_file_free (key_file);
   exit (EXIT_SUCCESS);

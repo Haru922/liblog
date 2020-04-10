@@ -1,9 +1,9 @@
 #include "liblog.h"
 
 int
-log_read (GKeyFile *key_file,
-          char *conf_file,
-          gboolean reload_flag)
+log_conf_load (GKeyFile *key_file,
+               char *conf_file,
+               gboolean reload_flag)
 {
   GError *error = NULL;
   
@@ -31,10 +31,10 @@ log_read (GKeyFile *key_file,
 }
 
 gboolean
-log_get_value (GKeyFile *key_file,
-               char *section,
-               char *key,
-               gchar **value)
+log_conf_get_value (GKeyFile *key_file,
+                    char *section,
+                    char *key,
+                    gchar **value)
 {
   GError *error = NULL;
 
@@ -69,7 +69,7 @@ log_get_value (GKeyFile *key_file,
 }
 
 int
-log_get_level_flag (char *log_level)
+log_conf_get_level_flag (char *log_level)
 {
   if (!g_strcmp0 (log_level, "ERROR"))
     return G_LOG_LEVEL_ERROR;
@@ -86,14 +86,14 @@ log_get_level_flag (char *log_level)
 }
 
 gboolean
-log_get_conf (GKeyFile *key_file,
-              gchar **log_conf)
+log_conf_get_settings (GKeyFile *key_file,
+                       gchar **log_conf)
 {
-  if (log_get_value (key_file, "LOG", "PATH", &log_conf[LOG_PATH])
-      && log_get_value (key_file, "LOG", "FMT", &log_conf[LOG_FMT])
-      && log_get_value (key_file, "LOG", "LEVEL", &log_conf[LOG_LEVEL])
-      && log_get_value (key_file, "LOG", "MAX_BYTES", &log_conf[LOG_MAX_BYTES])
-      && log_get_value (key_file, "LOG", "BACKUP_COUNT", &log_conf[LOG_BACKUP_COUNT]))
+  if (log_conf_get_value (key_file, "LOG", "PATH", &log_conf[LOG_PATH])
+      && log_conf_get_value (key_file, "LOG", "FMT", &log_conf[LOG_FMT])
+      && log_conf_get_value (key_file, "LOG", "LEVEL", &log_conf[LOG_LEVEL])
+      && log_conf_get_value (key_file, "LOG", "MAX_BYTES", &log_conf[LOG_MAX_BYTES])
+      && log_conf_get_value (key_file, "LOG", "BACKUP_COUNT", &log_conf[LOG_BACKUP_COUNT]))
   {
     return TRUE;
   }
@@ -123,7 +123,7 @@ log_write (GKeyFile *key_file,
   gchar **file_separator;
   int log_file_cnt = 0;
 
-  if (!log_get_conf (key_file, log_conf))
+  if (!log_conf_get_settings (key_file, log_conf))
   {
     return FALSE;
   }
@@ -156,10 +156,13 @@ log_write (GKeyFile *key_file,
 
   while ((dir_file = g_dir_read_name (dir)) != NULL)
   {
+    /*
     if (log_file_cnt == atoi (log_conf[LOG_BACKUP_COUNT]))
     {
+      g_warning ("BACKUP COUNT REACHED.\n");
     }
-    else if (!g_strcmp0 (output_file_name, dir_file))
+    */
+    if (!g_strcmp0 (output_file_name, dir_file))
     {
       stat (output_file, &file_info);
       if (atoi (log_conf[LOG_MAX_BYTES]) <= file_info.st_size)
@@ -174,6 +177,11 @@ log_write (GKeyFile *key_file,
     }
   }
   g_dir_close (dir);
+  
+  if (log_file_cnt == atoi (log_conf[LOG_BACKUP_COUNT]))
+  {
+    g_warning ("BACKUP COUNT REACHED.\n");
+  }
 
   output_fp = fopen (output_file, "a");
   if (output_fp == NULL)
