@@ -1,7 +1,6 @@
 #include "liblog.h"
 
-int
-log_conf_load (GKeyFile *key_file,
+int log_conf_load (GKeyFile *key_file,
                char *conf_file,
                gboolean reload_flag)
 {
@@ -113,7 +112,7 @@ log_write (GKeyFile *key_file,
   gchar *output_file_identifier;
   gchar *output_file_name;
   gchar *output_file;
-  char *file_extension;
+  char *file_extension = "log";
   FILE *output_fp;
   gboolean ret_val;
   GDir *dir;
@@ -122,6 +121,9 @@ log_write (GKeyFile *key_file,
   struct stat file_info;
   gchar **file_separator;
   int log_file_cnt = 0;
+  gchar *log_file;
+  gchar *first_log_file = NULL;
+  time_t mtime = G_MAXINT32;
 
   if (!log_conf_get_settings (key_file, log_conf))
   {
@@ -130,7 +132,6 @@ log_write (GKeyFile *key_file,
 
   local_time = g_date_time_new_now_local ();
   log_time_prefix = g_date_time_format (local_time, "%a %b %d %H:%M:%S %Y"); 
-  file_extension = "log";
   output_file_identifier = g_date_time_format (local_time, "%F");
   output_file_name = g_strconcat (output_file_identifier, ".", file_extension, NULL);
   output_file = g_strconcat (log_conf[LOG_PATH], output_file_name, NULL);
@@ -148,6 +149,18 @@ log_write (GKeyFile *key_file,
     if (!g_strcmp0 (file_separator[1], file_extension))
     {
       log_file_cnt++;
+      log_file = g_strconcat (log_conf[LOG_PATH], dir_file, NULL);
+      stat (log_file, &file_info);
+      if (mtime > file_info.st_mtime)
+      {
+        mtime = file_info.st_mtime;
+        if (first_log_file != NULL)
+        {
+          g_free (first_log_file);
+        }
+        first_log_file = g_strdup (log_file);
+      }
+      g_free (log_file);
     }
     g_strfreev (file_separator);
   }
@@ -156,12 +169,6 @@ log_write (GKeyFile *key_file,
 
   while ((dir_file = g_dir_read_name (dir)) != NULL)
   {
-    /*
-    if (log_file_cnt == atoi (log_conf[LOG_BACKUP_COUNT]))
-    {
-      g_warning ("BACKUP COUNT REACHED.\n");
-    }
-    */
     if (!g_strcmp0 (output_file_name, dir_file))
     {
       stat (output_file, &file_info);
@@ -176,13 +183,9 @@ log_write (GKeyFile *key_file,
       }
     }
   }
-  g_dir_close (dir);
+  g_free (output_file_identifier);
+  g_free (output_file_name);
   
-  if (log_file_cnt == atoi (log_conf[LOG_BACKUP_COUNT]))
-  {
-    g_warning ("BACKUP COUNT REACHED.\n");
-  }
-
   output_fp = fopen (output_file, "a");
   if (output_fp == NULL)
   {
@@ -195,15 +198,36 @@ log_write (GKeyFile *key_file,
     fclose (output_fp);
     ret_val = TRUE;
   }
+  g_free (log_time_prefix);
+  g_free (output_file);
+
+  g_dir_rewind (dir);
+
+  log_file_cnt = 0;
+  while ((dir_file = g_dir_read_name (dir)) != NULL)
+  {
+    file_separator = g_strsplit (dir_file, ".", -1);
+    if (!g_strcmp0 (file_separator[1], file_extension))
+    {
+      log_file_cnt++;
+    }
+    g_strfreev (file_separator);
+  }
+  g_dir_close (dir);
+
+  if (atoi (log_conf[LOG_BACKUP_COUNT]) < log_file_cnt)
+  {
+    if (g_remove (first_log_file))
+    {
+      g_error ("Cannot Remove File: %s\n", first_log_file);
+    }
+  }
+  g_free (first_log_file);
 
   for (i = 0; i < LOG_INFO_NUMS; i++)
   {
     g_free (log_conf[i]);
   }
-  g_free (log_time_prefix);
-  g_free (output_file_identifier);
-  g_free (output_file_name);
-  g_free (output_file);
 
   return ret_val;
 }
